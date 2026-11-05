@@ -1,6 +1,7 @@
 #include "weather.h"
 #include "config.h"
 #include "settings.h"
+#include "ota.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
@@ -112,6 +113,7 @@ static void weatherTask(void*) {
   for (;;) {
     vTaskDelay(pdMS_TO_TICKS(1000));
     if (WiFi.status() != WL_CONNECTED || !weatherHasLocation()) continue;
+    if (ota_busy) continue;                          // firmware update streaming in: keep the radio free
 
     char key[40];                                    // location changed -> old data is wrong
     snprintf(key, sizeof(key), "%.4f,%.4f", (double)settings.wxLat, (double)settings.wxLon);

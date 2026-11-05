@@ -17,6 +17,11 @@
 #error "WIFI_PASS is missing: set it next to WIFI_SSID in include/wifi_credentials.h"
 #endif
 
+// -------- OTA (wireless flashing) - the password lives in wifi_credentials.h --------
+#ifndef OTA_PASSWORD
+#error "OTA_PASSWORD is missing: add  #define OTA_PASSWORD \"YourChosenPassword\"  to include/wifi_credentials.h"
+#endif
+
 // ---------------- WiFi tuning (the credentials are in wifi_credentials.h) ----------------
 // reduced TX power (the value your board joined with on v3.5)
 #define WIFI_TX_POWER       WIFI_POWER_11dBm
@@ -24,7 +29,7 @@
 #define MDNS_HOST           "deskbuddy"   // http://deskbuddy.local
 
 // ---------------- identity ----------------
-#define BUDDY_VERSION       "3.14"
+#define BUDDY_VERSION       "3.15"
 #define BUDDY_NAME_DEF      "Buddy"
 
 // ---------------- time ----------------

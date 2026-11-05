@@ -23,6 +23,7 @@
 #include "app.h"
 #include "webapi.h"
 #include "weather.h"
+#include "ota.h"
 
 static uint32_t frameLast = 0;
 
@@ -63,6 +64,7 @@ static void wifiTick(uint32_t now) {
                   WiFi.localIP().toString().c_str(), MDNS_HOST);
     webStart();                          // start the web server + mDNS
     clockOnWifi();                       // start NTP (NPL / NIC India)
+    otaStart();                          // wireless updates: espota + http://...:8080
   }
   if (!up && wasUp) Serial.println("[WIFI] connection lost, re-joining");
   wasUp = up;
@@ -102,6 +104,9 @@ void setup() {
 }
 
 void loop() {
+  otaTick();                              // OTA first: streaming firmware needs frequent calls
+  if (ota_busy) { delay(20); return; }    // an update is arriving - pause the buddy until it reboots
+
   uint32_t now = millis();
   float dt = (frameLast == 0) ? 0.033f : (now - frameLast) / 1000.0f;
 

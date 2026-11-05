@@ -1,5 +1,40 @@
 # Desk Buddy — change notes
 
+## v3.15 — OTA: flash over WiFi, USB cable retires
+**What's new:** after one last USB flash, every future update goes over the air. Two doors, both
+locked with the new `OTA_PASSWORD` (in `include/wifi_credentials.h`, git-ignored like the WiFi
+credentials):
+
+1. `tools\ota_update.bat` - builds with PlatformIO, then calls the espota uploader with the
+   password. Optional argument: the buddy's IP (default `deskbuddy.local`).
+2. Any browser: `http://deskbuddy.local:8080` (login `deskbuddy` / `OTA_PASSWORD`), upload
+   `.pio\build\esp32c3\firmware.bin`. Works from a phone (use the IP on Android - it cannot
+   resolve `.local`).
+
+**Why one last USB flash is unavoidable:** OTA needs TWO app partitions to write into, and the
+project was on `huge_app.csv` (one 3 MB app slot, no room for OTA). The layout is now
+`min_spiffs.csv` (two ~1.9 MB app slots). A partition table can only be rewritten over USB - a
+running image cannot repartition itself. Settings/alarms/tasks live in NVS at the same offset in
+both layouts, so they survive the switch.
+
+**Why the password is not in platformio.ini:** PlatformIO's espressif32 builder assembles the
+espota command line itself (`--debug --progress -i <port>`) and ignores `upload_flags`, so there
+is no ini option that could pass `--auth` - and a committed password would defeat its purpose
+anyway. The .bat reads it from the git-ignored `wifi_credentials.h` at upload time. (Verified
+against platform espressif32 v8.0.0's builder script and the bundled espota.py, which does
+support `--auth`.)
+
+**Safety:** an upload streams into the *inactive* app slot and only activates after arriving
+complete - power loss mid-upload leaves the running firmware untouched. While an upload runs,
+`ota_busy` pauses the buddy's app loop and the background weather fetch, so the radio is free.
+The upload refuses to start (both doors) without the password.
+
+**New files:** `include/ota.h`, `src/ota.cpp`, `tools/ota_update.bat`. Changed: `platformio.ini`
+(partition layout + usage docs), `include/config.h` (OTA_PASSWORD guard), `include/wifi_credentials.h`
+(third line), `src/main.cpp` (otaStart/otaTick + pause), `src/weather.cpp` (skips fetches during
+update), README, this file. Update: add `OTA_PASSWORD` to `wifi_credentials.h`, flash over USB
+once, then go wireless.
+
 ## v3.14 — credentials file renamed wifi.h -> wifi_credentials.h (Windows build fix)
 **What was wrong:** on Windows, file names are case-insensitive, and PlatformIO puts the
 project's `include/` folder on the header search path. So the moment `include/wifi.h`

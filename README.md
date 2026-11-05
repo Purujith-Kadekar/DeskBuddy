@@ -1,4 +1,4 @@
-# Desk Buddy v3.14
+# Desk Buddy v3.15
 
 ESP32-C3 + SH1106 OLED + TTP223 touch + tilt switch + passive buzzer.
 
@@ -26,11 +26,13 @@ change the numbers there to match your wiring and everything follows.
   git-ignored so it never leaves your machine - see section 1).
 
 ## 1. Your WiFi
-Your WiFi name and password live in **include/wifi_credentials.h** - that file is in `.gitignore`,
-so it is never committed to GitHub. Open it and set the two lines (the build refuses to run until you do):
+Your WiFi name, password and the OTA password live in **include/wifi_credentials.h** - that file is
+in `.gitignore`, so it is never committed to GitHub. Open it and set the three lines (the build
+refuses to run until you do):
 
     #define WIFI_SSID           "YourWiFiName"
     #define WIFI_PASS           "YourWiFiPassword"
+    #define OTA_PASSWORD        "ChangeMe"
 
 Build and upload. There is no hotspot; the buddy joins your WiFi (2.4 GHz only). Watch the Serial Monitor
 (115200): `[WIFI] connected. Web app: http://192.168.x.x`. The address is also in Menu -> Info.
@@ -39,12 +41,48 @@ WiFi **tuning** (TX power, retry interval, mDNS name) stays in `include/config.h
 Do not rename the file to `wifi.h`: on Windows that name collides with the ESP32 library's own
 `<WiFi.h>` and the build breaks (see FIX_NOTES v3.14).
 
-Upgrading from v3.13? **Rename** `include/wifi.h` to `include/wifi_credentials.h` (keep your
-credentials inside) - a file named `wifi.h` in `include/` breaks the build on Windows. From v3.12,
-take the credentials out of `include/secrets.h` and delete that file; from v3.11 or earlier, out of
-`include/config.h`. Then build and upload (`pio run -t upload`) and hard-refresh the web app
-(Ctrl+Shift+R). Settings, alarms and tasks are kept. Coming from v3.8? Also check `PIN_*` still
-match your wiring.
+### Updating over WiFi (OTA) - the cable goes in the drawer
+From v3.15 on, the buddy can be reflashed over WiFi. One last USB flash is needed **once**, now:
+this version changes the flash layout from one big app slot to two ~1.9 MB slots (`min_spiffs.csv`),
+and a partition change can only be written over USB. So: `pio run -t upload` with the cable, one
+last time. Settings, alarms and tasks live in a different region (NVS) and survive it.
+
+After that, everything goes over the air:
+
+- **The easy way** - `tools\ota_update.bat` (double-click or from a terminal). It builds the
+  firmware, then flashes `deskbuddy.local` wirelessly. Different buddy or `.local` not resolving?
+  `tools\ota_update.bat 192.168.1.42` with the IP from Menu -> Info. The script reads the OTA
+  password from `include/wifi_credentials.h` - nothing secret ever gets committed.
+- **The manual way** - same thing by hand:
+
+      pio run
+      python %USERPROFILE%\.platformio\packages\framework-arduinoespressif32\tools\espota.py ^
+        --debug --progress -i deskbuddy.local --auth=YOUR_OTA_PASSWORD ^
+        -f .pio\build\esp32c3\firmware.bin
+
+- **From any browser, phone included** - open `http://deskbuddy.local:8080` (user `deskbuddy`,
+  password = `OTA_PASSWORD`) and upload `.pio\build\esp32c3\firmware.bin`. Android phones cannot
+  resolve `.local` names - use the IP there.
+
+What to expect: the buddy freezes and stops answering its web app for the minute the upload takes,
+then reboots itself into the new firmware. A failed or interrupted upload changes nothing - the new
+image is only activated after it arrived complete. The upload only starts with the right password
+(both doors, network and browser, ask for it). If uploads keep timing out, the buddy may be too far
+from the router: raise `WIFI_TX_POWER` in `config.h` (e.g. `WIFI_POWER_19_5dBm`), flash once more,
+and lower it again if you want. The Serial Monitor only works while USB is attached - that is the
+one thing you lose by going wireless.
+
+Upgrading from v3.14? Add one line to `include/wifi_credentials.h` (the OTA password):
+
+    #define OTA_PASSWORD        "YourChosenPassword"
+
+then flash over USB one last time (`pio run -t upload`) - this version changes the flash layout
+to two OTA slots, and that needs the cable (see "Updating over WiFi" above). After this, updates
+go over the air. From v3.13, **rename** `include/wifi.h` to `include/wifi_credentials.h` (a file
+named `wifi.h` in `include/` breaks the build on Windows). From v3.12, take the credentials out of
+`include/secrets.h` and delete that file; from v3.11 or earlier, out of `include/config.h`.
+Then build and upload and hard-refresh the web app (Ctrl+Shift+R). Settings, alarms and tasks are
+kept. Coming from v3.8? Also check `PIN_*` still match your wiring.
 
 ## 2. Touching your buddy
 | What you do | What happens |
