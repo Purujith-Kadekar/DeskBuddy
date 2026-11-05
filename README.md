@@ -1,4 +1,4 @@
-# Desk Buddy v3.10
+# Desk Buddy v3.14
 
 ESP32-C3 + SH1106 OLED + TTP223 touch + tilt switch + passive buzzer.
 
@@ -22,27 +22,29 @@ change the numbers there to match your wiring and everything follows.
   to TOGGLE/latching mode, set `TOUCH_TOGGLE_MODE 1` in config.h.
 - The tilt switch is read with the internal pull-up: one leg to **GPIO 3**, the other to **GND** -
   polarity of the switch itself does not matter.
-- After a clone, copy `include/secrets.h.example` to `include/secrets.h` (that file is
-  git-ignored so your real PIN never leaves your machine).
+- After a clone, create `include/wifi_credentials.h` with your WiFi name/password (it is
+  git-ignored so it never leaves your machine - see section 1).
 
 ## 1. Your WiFi
-Open **include/config.h** and set the two lines at the top (the build refuses to run until you do):
+Your WiFi name and password live in **include/wifi_credentials.h** - that file is in `.gitignore`,
+so it is never committed to GitHub. Open it and set the two lines (the build refuses to run until you do):
 
     #define WIFI_SSID           "YourWiFiName"
     #define WIFI_PASS           "YourWiFiPassword"
 
-Optional extras live in **include/secrets.h**:
-
-    #define API_PIN         ""          // optional: PIN for the web app (empty = open)
-
 Build and upload. There is no hotspot; the buddy joins your WiFi (2.4 GHz only). Watch the Serial Monitor
 (115200): `[WIFI] connected. Web app: http://192.168.x.x`. The address is also in Menu -> Info.
 The radio runs at reduced TX power (WIFI_TX_POWER) which is what makes many ESP32-C3 boards connect.
-If you set an `API_PIN`, the web app asks for it once per browser tab.
+WiFi **tuning** (TX power, retry interval, mDNS name) stays in `include/config.h` - nothing secret there.
+Do not rename the file to `wifi.h`: on Windows that name collides with the ESP32 library's own
+`<WiFi.h>` and the build breaks (see FIX_NOTES v3.14).
 
-Upgrading from v3.9? Just build and upload (`pio run -t upload`), then hard-refresh the web app
-(Ctrl+Shift+R). Settings, alarms and tasks are kept. Coming from v3.8? Also copy your WiFi
-name/password into `include/config.h` (check `PIN_*` still match your wiring).
+Upgrading from v3.13? **Rename** `include/wifi.h` to `include/wifi_credentials.h` (keep your
+credentials inside) - a file named `wifi.h` in `include/` breaks the build on Windows. From v3.12,
+take the credentials out of `include/secrets.h` and delete that file; from v3.11 or earlier, out of
+`include/config.h`. Then build and upload (`pio run -t upload`) and hard-refresh the web app
+(Ctrl+Shift+R). Settings, alarms and tasks are kept. Coming from v3.8? Also check `PIN_*` still
+match your wiring.
 
 ## 2. Touching your buddy
 | What you do | What happens |
@@ -170,6 +172,8 @@ The 15/30 minute timings live in `include/config.h` (`DND_IDLE_SLEEP_MS`, `DND_I
 ## 8. Study timer, alarms, reminders
 Focus session: study glasses drop on, serious face; break: glasses off. Alarms ring full-screen;
 reminders slide in from the top like a phone notification and ring until you tap once.
+Starting a session from the web app brings the buddy to its face screen whatever it was showing
+(widgets, menu or a dark panel) - only a ringing alarm keeps the screen.
 All managed in the web app (Planner tab); the next ones are also on the device: Menu -> Up next, and the Up next widget.
 
 ## 9. Time

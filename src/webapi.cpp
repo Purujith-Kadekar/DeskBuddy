@@ -25,16 +25,6 @@
 
 static WebServer httpServer(80);
 
-// Optional PIN (API_PIN in secrets.h). Empty = open, like before. The web app sends it
-// in the X-Pin header and asks for it once per browser tab.
-static bool authed() {
-  if (!API_PIN[0]) return true;
-  if (httpServer.header("X-Pin") == API_PIN) return true;
-  httpServer.send(401, "application/json", "{\"ok\":false,\"error\":\"PIN required\"}");
-  return false;
-}
-#define AUTH() do { if (!authed()) return; } while (0)
-
 // ---------------- tiny JSON helpers (no ArduinoJson dep) ----------------
 
 // Finds the VALUE position of a key. The scanner walks the text token by token and skips whole
@@ -133,7 +123,6 @@ static void addPomo(String& s) {
 }
 
 static void handleStatus() {
-  AUTH();
   String s;
   s.reserve(1800);                                   // one allocation instead of many growing ones
   s = "{\"ok\":true,\"name\":\"";
@@ -295,7 +284,6 @@ static String alarmJson(int i, const Alarm& a) {
 }
 
 static void handleAlarmsGet() {
-  AUTH();
   String s = "{\"ok\":true,\"alarms\":[";
   int on = 0;
   for (int i = 0; i < alarmsCount(); i++) {
@@ -382,7 +370,6 @@ static bool parseAlarmBody(const String& body, Alarm& a, long& idOut) {
 }
 
 static void handleAlarmPost() {
-  AUTH();
   String body = httpServer.arg("plain");
   Alarm a;
   long id;
@@ -404,7 +391,6 @@ static void handleAlarmPost() {
 }
 
 static void handleAlarmDelete() {
-  AUTH();
   long id = -1;
   for (uint8_t i = 0; i < httpServer.args(); i++)
     if (httpServer.argName(i) == "id") id = httpServer.arg(i).toInt();
@@ -415,7 +401,6 @@ static void handleAlarmDelete() {
 }
 
 static void handleAlarmAction() {
-  AUTH();
   String body = httpServer.arg("plain");
   String action = "";
   jStr(body, "action", action);
@@ -468,7 +453,6 @@ static String taskJson(int i, const Task& t) {
 }
 
 static void handleTasksGet() {
-  AUTH();
   String s = "{\"ok\":true,\"tasks\":[";
   for (int i = 0; i < tasksCount(); i++) {
     if (i) s += ",";
@@ -489,7 +473,6 @@ static bool parseDateStr(const String& d, uint16_t& y, uint8_t& mo, uint8_t& da)
 }
 
 static void handleTaskPost() {
-  AUTH();
   String body = httpServer.arg("plain");
   long id = -1;
   String title, date, end, timeStr;
@@ -546,7 +529,6 @@ static void handleTaskPost() {
 }
 
 static void handleTaskDelete() {
-  AUTH();
   long id = -1;
   for (uint8_t i = 0; i < httpServer.args(); i++)
     if (httpServer.argName(i) == "id") id = httpServer.arg(i).toInt();
@@ -559,11 +541,14 @@ static void handleTaskDelete() {
 // ---------------- other endpoints ----------------
 
 static void handlePomodoro() {
-  AUTH();
   String body = httpServer.arg("plain");
   String action = "";
   jStr(body, "action", action);
-  if (action == "start") pomoStart();
+  if (action == "start") {
+    bool wasLive = pomoRunning() && !pomoStatus().paused;    // start that begins/resumes a session -> show it
+    pomoStart();
+    if (!wasLive) appPomoToFront();
+  }
   else if (action == "pause") pomoPause();
   else if (action == "reset") pomoReset();
   else if (action == "skip") pomoSkip();
@@ -580,7 +565,6 @@ static void handlePomodoro() {
 }
 
 static void handleFace() {
-  AUTH();
   String body = httpServer.arg("plain");
   String f = "";
   if (jStr(body, "face", f)) {
@@ -645,7 +629,6 @@ static long parseHM(const String& s) {
 }
 
 static void handleSettingsPost() {
-  AUTH();
   String body = httpServer.arg("plain");
   long v = -1;
   if (jInt(body, "volume", v) && v >= 0 && v <= 10) {
@@ -699,7 +682,6 @@ static void handleSettingsPost() {
 }
 
 static void handleAction() {
-  AUTH();
   String body = httpServer.arg("plain");
   String a = "";
   jStr(body, "a", a);
@@ -733,8 +715,6 @@ static bool serverStarted = false;
 
 // routes can be registered any time; the listening socket is only opened once WiFi is up
 void webBegin() {
-  static const char* hdrs[] = { "X-Pin" };
-  httpServer.collectHeaders(hdrs, 1);
   httpServer.on("/", HTTP_GET, handleRoot);
   httpServer.on("/face.js", HTTP_GET, handleFaceJs);
   httpServer.on("/api/status", HTTP_GET, handleStatus);
@@ -747,7 +727,7 @@ void webBegin() {
   httpServer.on("/api/tasks", HTTP_DELETE, handleTaskDelete);
   httpServer.on("/api/pomodoro", HTTP_POST, handlePomodoro);
   httpServer.on("/api/face", HTTP_POST, handleFace);
-  httpServer.on("/api/settings", HTTP_GET, []() { AUTH(); handleSettingsGet(); });
+  httpServer.on("/api/settings", HTTP_GET, handleSettingsGet);
   httpServer.on("/api/settings", HTTP_POST, handleSettingsPost);
   httpServer.on("/api/action", HTTP_POST, handleAction);
   httpServer.onNotFound(handleNotFound);

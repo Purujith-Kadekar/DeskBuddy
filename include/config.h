@@ -2,21 +2,29 @@
 // ============================================================
 //  config.h - everything you might want to change, in one place
 //
-//  >>> PUT YOUR WIFI NAME AND PASSWORD RIGHT HERE (2.4 GHz only) <<<
-//  The optional web PIN is in include/secrets.h.
+//  >>> YOUR WIFI NAME AND PASSWORD LIVE IN include/wifi_credentials.h <<<
+//  (that file is git-ignored, so they never reach GitHub)
 // ============================================================
-#include "secrets.h"
+#if !__has_include("wifi_credentials.h")
+#error "include/wifi_credentials.h not found: create it with your WiFi name/password - see README section 1"
+#endif
+#include "wifi_credentials.h"
 
-// ---------------- WiFi (2.4 GHz only) ----------------
-#define WIFI_SSID           "YourWiFiName"
-#define WIFI_PASS           "YourWiFiPassword"
+#ifndef WIFI_SSID
+#error "WIFI_SSID is missing: set it in include/wifi_credentials.h"
+#endif
+#ifndef WIFI_PASS
+#error "WIFI_PASS is missing: set it next to WIFI_SSID in include/wifi_credentials.h"
+#endif
+
+// ---------------- WiFi tuning (the credentials are in wifi_credentials.h) ----------------
 // reduced TX power (the value your board joined with on v3.5)
 #define WIFI_TX_POWER       WIFI_POWER_11dBm
 #define WIFI_RETRY_MS       15000         // re-join attempt every 15 s
 #define MDNS_HOST           "deskbuddy"   // http://deskbuddy.local
 
 // ---------------- identity ----------------
-#define BUDDY_VERSION       "3.10"
+#define BUDDY_VERSION       "3.14"
 #define BUDDY_NAME_DEF      "Buddy"
 
 // ---------------- time ----------------

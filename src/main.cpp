@@ -3,7 +3,7 @@
 //  ESP32-C3 + SH1106 OLED + TTP223 touch + tilt + buzzer
 //
 //  WiFi: station mode only (no hotspot). Put your router name and
-//  password at the top of include/config.h.
+//  password in include/wifi_credentials.h (git-ignored).
 //  The join is non-blocking, so the buddy wakes up and animates
 //  immediately; the web page + clock sync start by themselves the
 //  moment WiFi connects.
@@ -29,7 +29,7 @@ static uint32_t frameLast = 0;
 // Fail the BUILD (not the upload, minutes later) if the WiFi details were never filled in.
 constexpr bool sameStr(const char* a, const char* b) { return *a == *b && (*a == 0 || sameStr(a + 1, b + 1)); }
 static_assert(!sameStr(WIFI_SSID, "YourWiFiName"),
-              "Set WIFI_SSID and WIFI_PASS at the top of include/config.h before building");
+              "Set WIFI_SSID and WIFI_PASS in include/wifi_credentials.h before building");
 
 // ---------------- WiFi (the same recipe that connected on this board) ----------------
 static bool     haveWifi = false;
@@ -46,7 +46,7 @@ static void wifiJoin() {
 static void wifiBegin() {
   haveWifi = strlen(WIFI_SSID) > 0;
   if (!haveWifi) {
-    Serial.println("[WIFI] no network set - put WIFI_SSID / WIFI_PASS in include/config.h");
+    Serial.println("[WIFI] no network set - put WIFI_SSID / WIFI_PASS in include/wifi_credentials.h");
     return;
   }
   Serial.printf("[WIFI] joining '%s' ...\n", WIFI_SSID);

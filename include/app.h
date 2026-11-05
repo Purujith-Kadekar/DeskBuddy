@@ -103,6 +103,8 @@ void appStopRinging(bool snooze);
 
 // pomodoro event hook (pomodoro.cpp calls this)
 void appPomoEvent(uint8_t evt);
+// a session was started from the web app: it owns the face, so leave widgets / wake up
+void appPomoToFront();
 
 // web "action" dispatcher: pet|party|sleep|wake|widgets|face|weather
 bool appAction(const char* a);

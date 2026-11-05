@@ -1,5 +1,109 @@
 # Desk Buddy — change notes
 
+## v3.14 — credentials file renamed wifi.h -> wifi_credentials.h (Windows build fix)
+**What was wrong:** on Windows, file names are case-insensitive, and PlatformIO puts the
+project's `include/` folder on the header search path. So the moment `include/wifi.h`
+existed, every `#include <WiFi.h>` in the firmware (main, webapi, weather, clocksync,
+app, widgets - six files) resolved to **your credentials file** instead of the ESP32
+WiFi library. The build then failed with `'WiFi' was not declared`, `'WL_CONNECTED' was
+not declared`, `'WIFI_STA' was not declared; did you mean WIFI_SSID?` and
+`'WIFI_POWER_11dBm' was not declared`. That "did you mean WIFI_SSID?" was the tell:
+WIFI_SSID is your own macro. Filling in the credentials correctly changed nothing -
+the file's mere existence under that name was the problem. Linux and macOS are
+case-sensitive, so the same tree built fine there, which is why this slipped through.
+
+**Fix:** the credentials file is now **include/wifi_credentials.h** - no ESP32/Arduino
+header carries that name, so `<WiFi.h>` resolves to the real library on every
+filesystem. `config.h` pulls the credentials from it; `.gitignore` excludes it (and
+still excludes the old `wifi.h` name, in case a v3.13 copy lingers).
+
+**Upgrading from v3.13:** rename `include/wifi.h` to `include/wifi_credentials.h`
+(credentials inside unchanged) and rebuild. If you copy the v3.14 files over an
+existing project, delete any leftover `include/wifi.h` afterwards - as long as that
+file exists, it still shadows `<WiFi.h>` on Windows.
+
+Changed files: `include/wifi_credentials.h` (renamed), `include/config.h`,
+`src/main.cpp` (messages), `.gitignore`, README, this file. Update: rename the file,
+build and upload.
+
+## v3.13 — one simple credentials file (include/wifi.h), web-app PIN removed
+**What changed:** your WiFi name and password now live in exactly one place,
+**include/wifi.h** - two lines, nothing else - and that file is in `.gitignore`, so it is
+never committed. `config.h` pulls the credentials from it (`#include "wifi.h"`); all the
+WiFi tuning values stay in `config.h` as before.
+
+The optional web-app **PIN feature is gone entirely**: no `API_PIN`, no `X-Pin` header,
+no PIN prompt in the web app, no `include/secrets.h`, no `secrets.h.example`. Anyone on
+your WiFi can open the web app, exactly like before the PIN existed. If you had a
+`secrets.h`, move its two WiFi lines into `wifi.h` and delete it.
+
+The build still refuses to run until the credentials are real: no `include/wifi.h` ->
+*"include/wifi.h not found: create it with your WiFi name/password - see README section 1"*;
+placeholders left in -> the `static_assert` stops the build, pointing at `include/wifi.h`.
+
+Changed files: `include/wifi.h` (new), `include/config.h`, `src/main.cpp` (messages),
+`src/webapi.cpp` (auth removed), `tools/webui.html` + regenerated `src/webui.cpp`
+(PIN prompt removed), `.gitignore`, `include/secrets.h.example` (deleted), README, this
+file. Update: move your credentials into `include/wifi.h`, build and upload.
+
+## v3.12 — WiFi credentials moved out of config.h
+**Why:** `WIFI_SSID` / `WIFI_PASS` used to sit in `include/config.h`, a file you commit -
+one careless `git add .` away from publishing your WiFi password. They now live in
+**include/secrets.h**, which `.gitignore` has always excluded, next to the optional
+web-app PIN. The committed template is **include/secrets.h.example**: copy it to
+`include/secrets.h`, fill in your WiFi name/password, build.
+
+Nothing else about WiFi changed - `main.cpp` reads the same macros through `config.h`,
+and the tuning values (TX power, retry interval, mDNS name) stay in `config.h` because
+they are not secret.
+
+Two guard rails make the move impossible to get wrong:
+
+- no `include/secrets.h` at all -> the build stops with
+  *"WIFI_SSID is missing: copy include/secrets.h.example to include/secrets.h and set
+  your WiFi name/password there"*;
+- the file exists but still holds the placeholder -> the existing `static_assert`
+  stops the build, now pointing at `include/secrets.h` too. The Serial Monitor hint
+  was updated to match.
+
+**Upgrading:** take your WiFi name/password out of `include/config.h` and put them in
+`include/secrets.h` (create it from the example if it does not exist). If you ever
+pushed an older `config.h` with real credentials, remember git keeps them in history -
+rotate the WiFi password or rewrite the history before making the repo public.
+
+Changed files: `include/config.h`, `include/secrets.h.example`, `src/main.cpp` (two
+messages), README, this file. Update: move your credentials, build and upload.
+
+## v3.11 — study timer started from the web app now shows up
+**What was wrong:** starting the pomodoro from the web app while the buddy was on a
+widget screen left it there. The timer ran (the corner of the widget screen carried a
+small "STUDY 24:59"), but the actual focus experience - the big focus face with study
+glasses, the countdown and the progress bar - only ever appeared on the home face
+screen, and only if you happened to be on it. The device menu did it right: its
+Timer item switches to the face screen after starting. The web API's `start` just
+called `pomoStart()` and left the screen alone.
+
+**The fix:** new `appPomoToFront()` in `src/app.cpp` - the session owns the face, so a
+start (or resume) that comes from the web app now leaves the widget screens (and a
+dark panel: it wakes the buddy) and lands on the face screen, exactly like the menu's
+own start. `handlePomodoro()` in `src/webapi.cpp` calls it for the `start` action,
+but only when the action actually begins or resumes a session - pressing start while
+a session is already live no longer yanks the screen. A ringing alarm keeps priority;
+the session simply continues behind it. Pausing, skipping and resetting are unchanged
+(no screen change).
+
+Verified with a host-compiled harness running the exact transition logic: start /
+resume on widgets -> face screen; no-op start while live -> stays on widgets; start on
+face / while ringing / while the menu is open / while the panel is asleep all behave
+as described above.
+
+Also in this release: `.gitignore` now covers all PlatformIO build output
+(`.pio/`, legacy dirs, `compile_commands.json`, editor-generated files, stray
+`*.o/*.elf/...`), and `BUDDY_VERSION` reports 3.11.
+
+Changed files: `src/app.cpp`, `include/app.h`, `src/webapi.cpp`, `.gitignore`,
+`include/config.h`, this file, README. Update: build and upload.
+
 ## v3.10 — area-wise weather location search
 The weather location search in the web app only knew **cities** (Open-Meteo geocoding),
 so "Koramangala" or "HSR Layout" could not be pinned — you got Bengaluru's city-center

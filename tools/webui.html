@@ -390,20 +390,10 @@ function shortDate(s){const p=parseISO(s);return p?p.d+' '+MON[p.m-1]:s;}
 
 /* ---------- helpers ---------- */
 function toast(m,err){const t=$('toast');t.textContent=m;t.className='show'+(err?' err':'');clearTimeout(toast.h);toast.h=setTimeout(()=>t.className='',2300);}
-let PIN='',PIN_SKIP=0;try{PIN=sessionStorage.getItem('pin')||'';}catch(e){}
 async function api(path,method,body){
   const o={method:method||'GET',headers:{}};
-  if(PIN)o.headers['X-Pin']=PIN;
   if(body!==undefined){o.body=JSON.stringify(body);o.headers['Content-Type']='application/json';}
   const r=await fetch(path,o); let j=null; try{j=await r.json();}catch(e){}
-  if(r.status===401){                       /* the buddy has a PIN (API_PIN in secrets.h) */
-    if(Date.now()>PIN_SKIP){
-      const p=prompt('This buddy is PIN protected.\nEnter the PIN:');
-      if(p){PIN=p;try{sessionStorage.setItem('pin',p);}catch(e){}return api(path,method,body);}
-      PIN_SKIP=Date.now()+60000;            /* cancelled: do not nag on every poll */
-    }
-    throw new Error('PIN required');
-  }
   if(!r.ok)throw new Error((j&&j.error)||('HTTP '+r.status));
   if(!j||typeof j!=='object')throw new Error('bad reply from the buddy');
   if(j.ok===false)throw new Error(j.error||'request failed');

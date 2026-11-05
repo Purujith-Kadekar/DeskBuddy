@@ -252,6 +252,19 @@ void appPomoEvent(uint8_t evt) {
   }
 }
 
+// a study session started from the web app: the session owns the face (focus
+// expression, study glasses, countdown + progress bar), so leave the widget
+// screens - and a dark panel - exactly like starting it from the menu does.
+// A ringing alarm keeps the screen; the session continues behind it.
+void appPomoToFront() {
+  appWake();
+  if (app.mode == UI_WIDGET || app.mode == UI_MENU) {
+    app.mode = UI_FACE;
+    app.returnMode = UI_FACE;
+    app.menuItem = 0; app.menuSub = 0; app.subView = 0;
+  }
+}
+
 bool appAction(const char* a) {
   if (!strcmp(a, "pet")) { appWake(); app.dndIdle = millis(); appPet(); return true; }
   if (!strcmp(a, "party")) { appWake(); app.dndIdle = millis(); appParty(); return true; }
