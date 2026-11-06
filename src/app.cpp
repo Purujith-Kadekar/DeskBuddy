@@ -87,6 +87,7 @@ void appSetFace(Expression e) {
   app.face = e;
   app.script = nullptr;             // a manual choice cancels any running scene
   app.emoKick = true;
+  app.idleSince = millis();         // a manual face choice (menu or web app) is interaction
 }
 
 void appStyleChanged() {
@@ -94,6 +95,7 @@ void appStyleChanged() {
   app.face = appHomeFace();
   app.reactUntil = 0;
   uint32_t now = millis();
+  app.idleSince = now;              // a style change (menu or web app) is interaction
   app.nextAutoFace = now + rrange(M().chgMin, M().chgMax);
   app.nextScene = now + (M().sceneMax ? rrange(M().sceneMin, M().sceneMax) : 0);
   app.appliedMood = -1;             // force retarget
@@ -114,7 +116,7 @@ void appParty() {
 // shaking = irritating it: surprised -> dizzy -> angry -> crying (resets after 12 s of peace)
 void appShakeReact() {
   uint32_t now = millis();
-  app.dndIdle = now;                     // interaction: restarts the DND idle clock
+  app.idleSince = now;                     // interaction: restarts the idle clock
   if (now - app.lastShake > 12000UL) app.shakeLevel = 0;
   app.lastShake = now;
   if (app.shakeLevel < 250) app.shakeLevel++;
@@ -134,8 +136,9 @@ void appSleepNow(uint32_t powerOffIn) {
   app.face = EX_SLEEP;
   app.reactUntil = 0;
   app.script = nullptr;
-  app.emoKick = true;
+  react(EX_YAWN, 1600);                   // a little yawn on the way down
   app.sleepAt = millis() + powerOffIn;    // let the eyes drift shut first
+  app.lastActive = 0;                     // force the dim level while drifting off (dark rooms!)
   audioStop();
 }
 
@@ -143,7 +146,8 @@ void appWake() {
   app.lastActive = millis();
   app.sleepAt = 0;
   app.dndSlept = false;                  // awake = no longer "we put it to bed"
-  app.dndIdle = millis();
+  app.ringWasAsleep = app.ringWasDeep = false;   // an explicit wake stays awake
+  app.idleSince = millis();
   if (app.mode == UI_SLEEP) {
     displaySleep(false);
     app.mode = UI_FACE;
@@ -164,6 +168,11 @@ void appSleepToggle() {
 // ============================================================
 
 static void ringCommon(int alarmIdx, const char* label, uint8_t melody, uint8_t type) {
+  // a ring always wakes a sleeping buddy - remember it was asleep so it can go
+  // back to bed once the ring is done ( |= : a second ring while ringing must
+  // not forget how the whole episode started)
+  app.ringWasAsleep |= (app.mode == UI_SLEEP || app.sleepAt);
+  app.ringWasDeep   |= (app.mode == UI_SLEEP);
   displaySleep(false);
   app.sleepAt = 0;
   app.ringing = true;
@@ -224,7 +233,14 @@ static void stopRinging(bool snooze, bool automatic) {
     snoozeClear();
     Serial.println(automatic ? "[ALARM] gave up (nobody answered)" : "[ALARM] dismissed");
   }
-  sfx(SFX_OK);
+  if (app.ringWasAsleep) {                 // the ring had woken a sleeping buddy:
+    bool deep = app.ringWasDeep;           // nobody needs it awake - back to bed
+    app.ringWasAsleep = app.ringWasDeep = false;
+    appSleepNow(deep ? RING_RESLEEP_MS : IDLE_DEEP_MS);
+    Serial.println("[ALARM] back to sleep");
+  } else {
+    sfx(SFX_OK);
+  }
 }
 
 void appStopRinging(bool snooze) { stopRinging(snooze, false); }
@@ -252,22 +268,16 @@ void appPomoEvent(uint8_t evt) {
   }
 }
 
-// a study session started from the web app: the session owns the face (focus
-// expression, study glasses, countdown + progress bar), so leave the widget
-// screens - and a dark panel - exactly like starting it from the menu does.
-// A ringing alarm keeps the screen; the session continues behind it.
+// (v3.13) a pomodoro started from the web app switches the buddy to its face
+// screen - before, the timer ran invisibly if the buddy sat in widgets or a menu
 void appPomoToFront() {
   appWake();
-  if (app.mode == UI_WIDGET || app.mode == UI_MENU) {
-    app.mode = UI_FACE;
-    app.returnMode = UI_FACE;
-    app.menuItem = 0; app.menuSub = 0; app.subView = 0;
-  }
+  if (app.mode != UI_RINGING && app.mode != UI_NOTIFY) app.mode = UI_FACE;
 }
 
 bool appAction(const char* a) {
-  if (!strcmp(a, "pet")) { appWake(); app.dndIdle = millis(); appPet(); return true; }
-  if (!strcmp(a, "party")) { appWake(); app.dndIdle = millis(); appParty(); return true; }
+  if (!strcmp(a, "pet")) { appWake(); app.idleSince = millis(); appPet(); return true; }
+  if (!strcmp(a, "party")) { appWake(); app.idleSince = millis(); appParty(); return true; }
   if (!strcmp(a, "sleep")) { appSleepNow(); return true; }
   if (!strcmp(a, "wake")) { appWake(); return true; }
   if (!strcmp(a, "widgets") || !strcmp(a, "clock")) {
@@ -1061,7 +1071,7 @@ static void tiltTick(uint32_t now) {
   uint8_t mood = (uint8_t)curMood();
 
   if (rock) {                                         // rocked back and forth
-    app.dndIdle = now;
+    app.idleSince = now;
     app.tiltPhase = 0;
     app.tiltQuietUntil = now + 2200;
     if (rock >= 2) { react(EX_DIZZY, DIZZY_MS, true); app.rig.wobble = 1.0f; }
@@ -1076,7 +1086,7 @@ static void tiltTick(uint32_t now) {
   if (ph != app.tiltPhase) {
     app.tiltPhase = ph;
     if (ph) {                                         // reached a new stage of being held
-      app.dndIdle = now;
+      app.idleSince = now;
       react((Expression)TILT_FACES[mood][ph - 1], 600, ph >= 3);
       rigImpulse(app.rig, -0.9f * M().bounce);
     } else if (back >= TILT_RELIEF_MS) {              // set down after a long hold
@@ -1098,7 +1108,7 @@ static void openMenu() {
 static void onGesture(TouchGesture g, uint32_t now) {
   switch (g) {
     case TG_PET_START:
-      app.dndIdle = now;                                 // interaction: DND idle clock restarts
+      app.idleSince = now;                                 // interaction: idle clock restarts
       beginPetting(now - app.touch.petElapsed(now));
       break;
     case TG_PET_END:
@@ -1110,7 +1120,7 @@ static void onGesture(TouchGesture g, uint32_t now) {
         rigImpulse(app.rig, -1.0f);
         sfx(SFX_CLICK);
       } else {
-        app.dndIdle = now;                            // boop = interaction
+        app.idleSince = now;                            // boop = interaction
         appPet();
       }
       break;
@@ -1133,7 +1143,7 @@ void appBegin() {
   app.returnMode = UI_FACE;
   app.bootMs = millis();
   app.lastActive = millis();
-  app.dndIdle = millis();
+  app.idleSince = millis();
   app.dndSlept = false;
   app.sideSign = (rand32() & 1) ? 1 : -1;
   app.suppTouch = false;
@@ -1162,10 +1172,10 @@ void appTick(float dt) {
   }
 
   // back on the home face (from widgets, the menu or a ringing alarm):
-  // the do-not-disturb idle clock starts over
+  // the idle clock starts over
   static uint8_t lastMode = UI_FACE;
   if (app.mode != lastMode) {
-    if (app.mode == UI_FACE && !app.sleepAt) app.dndIdle = now;
+    if (app.mode == UI_FACE && !app.sleepAt) app.idleSince = now;
     lastMode = app.mode;
   }
 
@@ -1235,13 +1245,14 @@ void appTick(float dt) {
     // face / widget screens ignore these: the petting engine decides there
   }
 
-  // ----- do not disturb: only on the home face, never in a study session -----
+  // ----- idle on the home face: ANY time of day, not only the DND window -----
   // 15 min untouched -> sleeping face; the panel goes dark at 30 min total.
+  // Widgets, menus and study sessions never auto-sleep.
   if (app.mode == UI_FACE && !app.sleepAt && !app.petting && pomoState() == PO_IDLE &&
-      dndActiveNow() && (now - app.dndIdle) >= DND_IDLE_SLEEP_MS) {
-    app.dndSlept = true;
-    appSleepNow(DND_IDLE_DEEP_MS);       // eyes shut now, panel off after another stretch
-    Serial.println("[DND] idle on the home face - drifting to sleep");
+      (now - app.idleSince) >= IDLE_SLEEP_MS) {
+    app.dndSlept = dndActiveNow();      // fell asleep inside DND -> wakes when the window ends
+    appSleepNow(IDLE_DEEP_MS);          // eyes shut now, panel off after another stretch
+    Serial.println("[IDLE] untouched on the home face - drifting to sleep");
   }
 
   if (app.sleepAt && now >= app.sleepAt) {         // eyes are shut: power the panel down

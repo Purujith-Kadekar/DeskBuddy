@@ -49,6 +49,18 @@ if errorlevel 1 (
     echo [FAILED] If it says "no answer"/timeout: is the buddy plugged in and on
     echo           WiFi? Try the IP address instead of deskbuddy.local
     echo           ^(find it in Menu - Info on the buddy^).
+    echo.
+    echo   "Authenticating ... OK" then "No response from device" = the buddy
+    echo   is fine but could not call BACK to this PC. Windows Firewall or a VPN
+    echo   is blocking it. Fix: allow python.exe in the firewall ^(Private AND
+    echo   Public^) or switch the VPN off. Or skip this script:
+    echo.
+    echo      open http://%HOST%:8080/update in any browser
+    echo      ^(user deskbuddy, your OTA password^), pick
+    echo      .pio\build\esp32c3\firmware.bin - upload - done.
+    echo.
+    echo   That door only needs PC-to-buddy traffic and always works. The
+    echo   buddy being asleep is no obstacle; it wakes for the flash.
     exit /b 1
 )
 echo.

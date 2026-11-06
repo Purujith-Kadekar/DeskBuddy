@@ -10,6 +10,7 @@
 // ============================================================
 #include <Arduino.h>
 #include <WiFi.h>
+#include <esp_wifi.h>
 #include "config.h"
 #include "display.h"
 #include "faces.h"
@@ -39,7 +40,9 @@ static uint32_t lastTry = 0;
 
 static void wifiJoin() {
   WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);                  // (v3.16) radio never naps: modem sleep slows transfers to a crawl
   WiFi.setAutoReconnect(true);
+  esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW_HT20);   // (v3.19) 20 MHz channel: far more robust on a crowded 2.4 GHz band
   WiFi.setTxPower(WIFI_TX_POWER);        // lower TX power: many ESP32-C3 boards only join like this
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 }
@@ -105,7 +108,8 @@ void setup() {
 
 void loop() {
   otaTick();                              // OTA first: streaming firmware needs frequent calls
-  if (ota_busy) { delay(20); return; }    // an update is arriving - pause the buddy until it reboots
+  if (ota_busy) { delay(2); return; }     // (v3.16) update in progress: pause the buddy, but keep
+                                           // otaTick running ~500x/s so the upload is not throttled
 
   uint32_t now = millis();
   float dt = (frameLast == 0) ? 0.033f : (now - frameLast) / 1000.0f;

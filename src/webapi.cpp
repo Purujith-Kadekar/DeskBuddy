@@ -544,11 +544,7 @@ static void handlePomodoro() {
   String body = httpServer.arg("plain");
   String action = "";
   jStr(body, "action", action);
-  if (action == "start") {
-    bool wasLive = pomoRunning() && !pomoStatus().paused;    // start that begins/resumes a session -> show it
-    pomoStart();
-    if (!wasLive) appPomoToFront();
-  }
+  if (action == "start") { pomoStart(); appPomoToFront(); }   // (v3.13) jump to the face screen so the timer is visible
   else if (action == "pause") pomoPause();
   else if (action == "reset") pomoReset();
   else if (action == "skip") pomoSkip();

@@ -1,4 +1,4 @@
-# Desk Buddy v3.15
+# Desk Buddy v3.17
 
 ESP32-C3 + SH1106 OLED + TTP223 touch + tilt switch + passive buzzer.
 
@@ -22,8 +22,8 @@ change the numbers there to match your wiring and everything follows.
   to TOGGLE/latching mode, set `TOUCH_TOGGLE_MODE 1` in config.h.
 - The tilt switch is read with the internal pull-up: one leg to **GPIO 3**, the other to **GND** -
   polarity of the switch itself does not matter.
-- After a clone, create `include/wifi_credentials.h` with your WiFi name/password (it is
-  git-ignored so it never leaves your machine - see section 1).
+- After a clone, create **include/wifi_credentials.h** with your WiFi details (see section 1);
+  that file is git-ignored so it never leaves your machine.
 
 ## 1. Your WiFi
 Your WiFi name, password and the OTA password live in **include/wifi_credentials.h** - that file is
@@ -36,18 +36,17 @@ refuses to run until you do):
 
 Build and upload. There is no hotspot; the buddy joins your WiFi (2.4 GHz only). Watch the Serial Monitor
 (115200): `[WIFI] connected. Web app: http://192.168.x.x`. The address is also in Menu -> Info.
-The radio runs at reduced TX power (WIFI_TX_POWER) which is what makes many ESP32-C3 boards connect.
+The radio runs at reduced TX power (WIFI_TX_POWER) which is what makes many ESP32-C3 boards connect;
+uploads temporarily boost to full power on their own.
 WiFi **tuning** (TX power, retry interval, mDNS name) stays in `include/config.h` - nothing secret there.
-Do not rename the file to `wifi.h`: on Windows that name collides with the ESP32 library's own
-`<WiFi.h>` and the build breaks (see FIX_NOTES v3.14).
+Do not rename the credentials file to `wifi.h`: on Windows that name collides with the ESP32 library's
+own `<WiFi.h>` and the build breaks (see FIX_NOTES v3.14).
 
 ### Updating over WiFi (OTA) - the cable goes in the drawer
-From v3.15 on, the buddy can be reflashed over WiFi. One last USB flash is needed **once**, now:
-this version changes the flash layout from one big app slot to two ~1.9 MB slots (`min_spiffs.csv`),
-and a partition change can only be written over USB. So: `pio run -t upload` with the cable, one
-last time. Settings, alarms and tasks live in a different region (NVS) and survive it.
-
-After that, everything goes over the air:
+The buddy can be reflashed over WiFi. If you are on v3.14 or older, one last USB flash is needed
+**once**: v3.15 changed the flash layout from one big app slot to two ~1.9 MB slots (`min_spiffs.csv`),
+and a partition change can only be written over USB. Settings, alarms and tasks live in a different
+region (NVS) and survive it. From v3.15 on, every update goes over the air:
 
 - **The easy way** - `tools\ota_update.bat` (double-click or from a terminal). It builds the
   firmware, then flashes `deskbuddy.local` wirelessly. Different buddy or `.local` not resolving?
@@ -64,25 +63,24 @@ After that, everything goes over the air:
   password = `OTA_PASSWORD`) and upload `.pio\build\esp32c3\firmware.bin`. Android phones cannot
   resolve `.local` names - use the IP there.
 
-What to expect: the buddy freezes and stops answering its web app for the minute the upload takes,
-then reboots itself into the new firmware. A failed or interrupted upload changes nothing - the new
-image is only activated after it arrived complete. The upload only starts with the right password
-(both doors, network and browser, ask for it). If uploads keep timing out, the buddy may be too far
-from the router: raise `WIFI_TX_POWER` in `config.h` (e.g. `WIFI_POWER_19_5dBm`), flash once more,
-and lower it again if you want. The Serial Monitor only works while USB is attached - that is the
-one thing you lose by going wireless.
+What to expect: the buddy freezes and stops answering its web app while the upload runs, then
+reboots itself into the new firmware. An upload should take well under a minute - the radio never
+sleeps (v3.16) and automatically runs at full TX power while flashing. A failed or interrupted
+upload changes nothing: the new image is only activated after it arrived complete, and the upload
+only starts with the right password (both doors, network and browser, ask for it). If it still
+takes many minutes, it is the radio environment, not the code - try the buddy next to the router.
+Your internet plan speed is not involved: the firmware only travels inside your LAN. The Serial
+Monitor only works while USB is attached - that is the one thing you lose by going wireless.
 
-Upgrading from v3.14? Add one line to `include/wifi_credentials.h` (the OTA password):
-
-    #define OTA_PASSWORD        "YourChosenPassword"
-
-then flash over USB one last time (`pio run -t upload`) - this version changes the flash layout
-to two OTA slots, and that needs the cable (see "Updating over WiFi" above). After this, updates
-go over the air. From v3.13, **rename** `include/wifi.h` to `include/wifi_credentials.h` (a file
-named `wifi.h` in `include/` breaks the build on Windows). From v3.12, take the credentials out of
-`include/secrets.h` and delete that file; from v3.11 or earlier, out of `include/config.h`.
-Then build and upload and hard-refresh the web app (Ctrl+Shift+R). Settings, alarms and tasks are
-kept. Coming from v3.8? Also check `PIN_*` still match your wiring.
+Upgrading from v3.15? Flash this over the air (`tools\ota_update.bat`) - nothing else to do; it is
+the slow upload, every one after it is fast. From v3.14? Add one line to `include/wifi_credentials.h`
+(`#define OTA_PASSWORD "YourChosenPassword"`), then flash over USB one last time - this version
+changes the flash layout to two OTA slots, and that needs the cable. From v3.13? **Rename**
+`include/wifi.h` to `include/wifi_credentials.h` first (a file named `wifi.h` in `include/` breaks
+the build on Windows). From v3.12, take the credentials out of `include/secrets.h` and delete that
+file; from v3.11 or earlier, out of `include/config.h`. Then build, upload and hard-refresh the web
+app (Ctrl+Shift+R). Settings, alarms and tasks are kept. Coming from v3.8? Also check `PIN_*` still
+match your wiring.
 
 ## 2. Touching your buddy
 | What you do | What happens |
@@ -193,25 +191,30 @@ and while do-not-disturb is on. **Alarms and reminders always sound** - even wit
 medium level, so you cannot oversleep. The study-timer sounds follow the volume setting. Tasks stay silent - they
 are checklist items. Everything is editable in `src/audio.cpp` (voices, murmurs, volume tiers).
 
-## 7. Do not disturb (web app -> Settings)
-Pick a daily quiet window (default **8 PM - 6 AM**, it can wrap midnight). While it is active:
+## 7. Sleep & do not disturb
+**Idle sleep (any time of day).** Left alone on its **home face** (never in widgets, the menu or
+while a study timer runs), the buddy drifts to its sleeping face after **15 min** untouched - a
+little yawn, eyes shut - and the screen goes dark at **30 min** total. Any touch, picking it up
+or any action from the web app wakes it and starts the count over. **Alarms and reminders always
+ring through** and wake it; after the ring is answered it drifts back to sleep on its own
+(briefly showing the sleeping face if the panel was already off).
+
+**Do not disturb (web app -> Settings)** is the quiet part: pick a daily quiet window (default
+**8 PM - 6 AM**, it can wrap midnight). While it is active:
 
 - the buddy is **silent**: no emotion sounds, no murmurs, no cuckoo. **Alarms and reminders still ring**
   exactly as if nothing changed, and the study timer still sings at the end of a session.
-- on the **home face only** (never in widgets, the menu or while a timer runs): untouched for
-  **15 min** it drifts to its sleeping face, at **30 min** the screen goes dark. Any touch wakes it,
-  and the count starts over. After an alarm rings in the night the same 15/30 min cycle begins again.
-- when the window ends (or you switch DND off) the buddy **wakes up by itself**. A sleep you started
-  yourself from the menu is left alone.
+- a buddy that fell asleep **inside** the window wakes up by itself when the window ends
+  (or you switch DND off). A sleep you started yourself from the menu is left alone.
 
 The web app's home screen shows a small "do not disturb" note under the display while the window is on.
-The 15/30 minute timings live in `include/config.h` (`DND_IDLE_SLEEP_MS`, `DND_IDLE_DEEP_MS`).
+The 15/30 min and after-ring timings live in `include/config.h` (`IDLE_SLEEP_MS`, `IDLE_DEEP_MS`,
+`RING_RESLEEP_MS`).
 
 ## 8. Study timer, alarms, reminders
-Focus session: study glasses drop on, serious face; break: glasses off. Alarms ring full-screen;
+Focus session: study glasses drop on, serious face; break: glasses off. A session started from the
+web app jumps straight to the face screen so the timer is visible (v3.13). Alarms ring full-screen;
 reminders slide in from the top like a phone notification and ring until you tap once.
-Starting a session from the web app brings the buddy to its face screen whatever it was showing
-(widgets, menu or a dark panel) - only a ringing alarm keeps the screen.
 All managed in the web app (Planner tab); the next ones are also on the device: Menu -> Up next, and the Up next widget.
 
 ## 9. Time
@@ -230,6 +233,18 @@ comes back on any interaction (`OLED_DIM_AFTER_MS`, `OLED_DIM_PERCENT` in config
 **Touch pad set to TOGGLE (latching) mode?** Set `TOUCH_TOGGLE_MODE 1` in config.h. (Auto-detecting it from a long
 press was removed in v3.9 because a hand resting on the buddy could trigger it by mistake.)
 
+
+**OTA says "Authenticating ... OK" and then "No response from device"?** The buddy is fine - it
+answered you. The step that failed is the buddy calling BACK to your PC over TCP, and something on
+the PC never lets it in: Windows Firewall (no allow-rule for python.exe, or the WiFi network is set
+to "Public"), a VPN with a kill-switch, or antivirus network protection. Fix: allow `python.exe` in
+Windows Defender Firewall for **both Private and Public** networks (Windows Security -> Firewall &
+network protection -> Allow an app through firewall; the entry that matters is
+`%USERPROFILE%\.platformio\penv\Scripts\python.exe`), or switch the VPN off. No time for that?
+Use the browser door instead - `http://<buddy-ip>:8080/update` (user `deskbuddy`, your OTA
+password) and upload `.pio\build\esp32c3\firmware.bin`. It only needs PC-to-buddy traffic, which
+always works - and the .bat prints this exact recipe when it hits the problem. A sleeping buddy is
+no obstacle: the OTA door answers even with the panel dark.
 
 PlatformIO "TypeError ... NoneType" before any compiling = a failed framework download. Delete
 `.pio`, `%USERPROFILE%\.platformio\platforms\espressif32@src-*` and `...\packages\framework-arduinoespressif32*`,

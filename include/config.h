@@ -23,13 +23,16 @@
 #endif
 
 // ---------------- WiFi tuning (the credentials are in wifi_credentials.h) ----------------
-// reduced TX power (the value your board joined with on v3.5)
-#define WIFI_TX_POWER       WIFI_POWER_11dBm
+// reduced TX power (the value your board joined with on v3.5 - some ESP32-C3
+// boards only join like this). OTA uploads temporarily boost to the OTA value.
+#define WIFI_TX_POWER       WIFI_POWER_8_5dBm   // (v3.19) 8.5 dBm = the value reported most stable on ESP32-C3 SuperMini-type boards
+                                                // (weak RF/regulator: higher power = lost ACKs = crawling uploads). Won't join? try WIFI_POWER_11dBm
+#define WIFI_TX_POWER_OTA   WIFI_POWER_8_5dBm   // same as normal: a power jump during upload drops the link on these boards
 #define WIFI_RETRY_MS       15000         // re-join attempt every 15 s
 #define MDNS_HOST           "deskbuddy"   // http://deskbuddy.local
 
 // ---------------- identity ----------------
-#define BUDDY_VERSION       "3.15"
+#define BUDDY_VERSION       "3.19"
 #define BUDDY_NAME_DEF      "Buddy"
 
 // ---------------- time ----------------
@@ -82,11 +85,15 @@
 #define CUCKOO_LAST_HOUR    23
 #define QUIET_START_HOUR    23            // emotion sounds muted 23:00 - 07:00
 #define QUIET_END_HOUR      7
-// do-not-disturb (web app -> Settings): inside the window the buddy is silent
-// and, left alone on the home face, drifts to its sleeping face, then powers
-// the panel down. Alarms and reminders always ring through.
-#define DND_IDLE_SLEEP_MS   (15UL*60UL*1000UL)  // untouched on the home face -> sleeping face
-#define DND_IDLE_DEEP_MS    (15UL*60UL*1000UL)  // sleeping face -> panel off (30 min total)
+// do-not-disturb (web app -> Settings): inside the window the buddy is silent.
+// Idle sleep is separate and works ANY time of day: untouched on its home face
+// it drifts to its sleeping face, then powers the panel down. Alarms and
+// reminders always ring through, wake it, and after the ring it drifts back
+// to sleep by itself. Widgets, menus and study sessions never auto-sleep.
+#define IDLE_SLEEP_MS       (15UL*60UL*1000UL)  // untouched on the home face -> sleeping face
+#define IDLE_DEEP_MS        (15UL*60UL*1000UL)  // sleeping face -> panel off (30 min total)
+#define RING_RESLEEP_MS     8000UL              // woken from panel-off sleep by a ring:
+                                                // show the sleeping face this long, then dark again
 // ---------------- tilt switch (emotions when picked up / tipped / rocked) ----------------
 #define TILT_DEBOUNCE_MS    60            // a ball switch rattles: level must hold this long
 #define TILT_REHOME_MS      90000UL       // tipped this long = that is the new "upright"

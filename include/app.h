@@ -33,9 +33,10 @@ struct App {
   uint32_t scriptNext = 0, nextScene = 0;
   // sleeping: eyes close first, display powers off at sleepAt
   uint32_t sleepAt = 0;
-  // do-not-disturb: last interaction while on the home face + "we put it to
-  // bed ourselves" (so the buddy wakes up when the DND window ends)
-  uint32_t dndIdle = 0;
+  // idle: last interaction while on the home face (any time of day) - untouched
+  // long enough and the buddy drifts to sleep on its own. dndSlept: it fell
+  // asleep during the do-not-disturb window, so it wakes when the window ends
+  uint32_t idleSince = 0;
   bool     dndSlept = false;
   // ringing alarm (UI_RINGING) or phone-style reminder notification (UI_NOTIFY)
   bool ringing = false;
@@ -47,6 +48,8 @@ struct App {
   uint32_t ringStart = 0;              // when the current ring began (auto-stop timer)
   uint8_t  ringAuto = 0;               // consecutive auto-snoozes of the current alarm
   uint32_t ringSig = 0;                // which alarm is ringing (so a list edit cannot disable the wrong one)
+  bool     ringWasAsleep = false;      // the ring woke a sleeping buddy -> back to sleep after the ring
+  bool     ringWasDeep = false;        // ...and the panel was already off (short show, then dark again)
   UiMode returnMode = UI_FACE;         // where to go back to after ringing / menu
   // emotional sounds + irritation
   uint32_t lastEmo = 0;
@@ -103,7 +106,7 @@ void appStopRinging(bool snooze);
 
 // pomodoro event hook (pomodoro.cpp calls this)
 void appPomoEvent(uint8_t evt);
-// a session was started from the web app: it owns the face, so leave widgets / wake up
+// (v3.13) a pomodoro started from the web app jumps to the face screen so the timer is visible
 void appPomoToFront();
 
 // web "action" dispatcher: pet|party|sleep|wake|widgets|face|weather

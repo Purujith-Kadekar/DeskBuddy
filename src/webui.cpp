@@ -283,7 +283,7 @@ background:rgba(124,196,255,.15);color:var(--ac)}
       <label class="f" style="flex:1;margin:0">Quiet from<input type="time" id="sDndFrom"></label>
       <label class="f" style="flex:1;margin:0">Until<input type="time" id="sDndTo"></label>
     </div>
-    <p class="h" style="margin:10px 0 12px">In the window the buddy is silent (no emotion sounds, no cuckoo — alarms and reminders still ring). Left alone on its home face for 15 min it drifts to its sleeping face, at 30 min the screen goes dark, and it wakes up on its own when the window ends. Widgets and menus are never auto-slept.</p>
+    <p class="h" style="margin:10px 0 12px">In the window the buddy is silent (no emotion sounds, no cuckoo — alarms and reminders still ring) and, if it fell asleep during the window, it wakes up on its own when the window ends. Sleeping works any time of day now: left alone on its home face for 15 min it drifts to its sleeping face, at 30 min the screen goes dark. Alarms and reminders wake it — after the ring it goes back to sleep. Widgets, menus and study sessions are never auto-slept.</p>
     <label class="f">Time zone<select id="sTz"></select></label>
     <label class="f" id="tzCustomBox" hidden>Custom POSIX TZ string<input type="text" id="sTzCustom" placeholder="e.g. IST-5:30" maxlength="40"></label>
     <div class="row"><button class="btn pri" id="sSave">Save settings</button></div>
