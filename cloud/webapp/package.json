@@ -1,0 +1,20 @@
+{
+  "name": "planner-webapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloud-first planner (tasks, reminders, alarms) for the DeskBuddy + Ventuno Q ecosystem. Vercel + Firestore single-doc sync.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "next": "^14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
